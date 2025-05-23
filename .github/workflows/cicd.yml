@@ -27,7 +27,7 @@ jobs:
         # This creates the binary in the root, as expected by the E2E script.
 
       - name: Upload artifact (application binary)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: gitwebhookproxy-binary
           path: gitwebhookproxy
