@@ -90,8 +90,25 @@ if [[ "$HTTP_STATUS_CODE" -lt 200 || "$HTTP_STATUS_CODE" -ge 300 ]]; then
 fi
 echo "HTTP status code OK."
 
-if [ ! -s /tmp/upstream_received.txt ]; then
-    echo "Error: /tmp/upstream_received.txt is empty. Mock upstream server received no data."
+# Wait for upstream_received.txt to be populated
+MAX_WAIT_SECONDS=10
+WAIT_INTERVAL_SECONDS=1
+ELAPSED_SECONDS=0
+FILE_POPULATED=false
+
+echo "Waiting for mock upstream server to receive data..."
+while [ $ELAPSED_SECONDS -lt $MAX_WAIT_SECONDS ]; do
+    if [ -s /tmp/upstream_received.txt ]; then
+        FILE_POPULATED=true
+        break
+    fi
+    sleep $WAIT_INTERVAL_SECONDS
+    ELAPSED_SECONDS=$((ELAPSED_SECONDS + WAIT_INTERVAL_SECONDS))
+    echo "Waited $ELAPSED_SECONDS seconds..."
+done
+
+if [ "$FILE_POPULATED" = false ]; then
+    echo "Error: /tmp/upstream_received.txt is empty or does not exist after $MAX_WAIT_SECONDS seconds. Mock upstream server received no data."
     cleanup
     exit 1
 fi
