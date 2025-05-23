@@ -167,6 +167,48 @@ PRs are welcome. In general, we follow the "fork-and-pull" Git workflow.
 
 NOTE: Be sure to merge the latest from "upstream" before making a pull request!
 
+## DevOps Pipeline with GitHub Actions
+
+This project uses GitHub Actions to automate the Continuous Integration and Continuous Deployment (CI/CD) pipeline. The workflow is defined in `.github/workflows/cicd.yml`.
+
+### Workflow Overview
+
+The pipeline automatically performs the following tasks:
+
+1.  **On Pull Requests to `main` branch:**
+    *   **Build Application**: Checks out the code and builds the `gitwebhookproxy` Go binary.
+    *   **Run E2E Tests**: Executes end-to-end tests located in `test/e2e/e2e_test.sh`. These tests start the application and a mock upstream server to verify basic proxying functionality.
+
+2.  **On Pushes to `main` branch (e.g., after merging a PR):**
+    *   **Build Application**: Same as above.
+    *   **Run E2E Tests**: Same as above.
+    *   **Build and Push Docker Image**:
+        *   If the E2E tests pass, the workflow builds a new Docker image for `gitwebhookproxy`.
+        *   It uses a multi-stage Docker build (leveraging `build/package/Dockerfile.build` and `build/package/Dockerfile.run`) to create an optimized image.
+        *   The image is tagged with `latest` and the Git commit SHA.
+        *   The tagged image is then pushed to Docker Hub.
+
+### Prerequisites for Docker Hub Push
+
+*   For the Docker image to be pushed to Docker Hub, the following secrets must be configured in the GitHub repository settings (under Settings > Secrets and variables > Actions):
+    *   `DOCKERHUB_USERNAME`: Your Docker Hub username.
+    *   `DOCKERHUB_TOKEN`: A Docker Hub access token with write permissions.
+*   The image will be pushed to `your_username/gitwebhookproxy` based on the `DOCKERHUB_USERNAME` secret.
+
+### Monitoring the Pipeline
+
+*   You can monitor the status and logs of the pipeline runs in the "Actions" tab of the GitHub repository.
+*   A status badge can also be added to the top of this README to show the current build status of the `main` branch (optional, can be added later if desired).
+
+### Local Development and `build-and-push.sh`
+
+The `build-and-push.sh` script is still available for building and pushing Docker images from your local environment. This can be useful for testing changes to the Dockerfiles or for pushing development images. However, for official releases/updates to the `main` branch, the GitHub Actions pipeline is the primary mechanism.
+
+To use it locally:
+1.  Ensure the script is executable: `chmod +x build-and-push.sh`
+2.  Run the script: `./build-and-push.sh`
+    (Follow the prompts for Docker Hub username and image name).
+
 ## Changelog
 
 View our closed [Pull Requests](https://github.com/stakater/GitWebhookProxy/pulls?q=is%3Apr+is%3Aclosed).
