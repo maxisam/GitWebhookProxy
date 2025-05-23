@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Go
         uses: actions/setup-go@v3
@@ -37,7 +37,7 @@ jobs:
     needs: build-app # Depends on the application build
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Download application binary
         uses: actions/download-artifact@v3
@@ -63,7 +63,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' # Only run on push to main
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up QEMU
         # Used for multi-platform builds, good practice though not strictly necessary for amd64
@@ -93,7 +93,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/gitwebhookproxy # Assumes DOCKERHUB_USERNAME secret and image name 'gitwebhookproxy'
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/gitwebhookproxy 
           tags: |
             type=sha,prefix= # Git SHA as a tag
             type=raw,value=latest,enable={{is_default_branch}} # 'latest' tag for the main branch
