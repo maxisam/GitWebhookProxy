@@ -55,7 +55,13 @@ sleep 2 # Wait for proxy to start
 
 # 3. Send a test webhook
 echo "Sending test webhook..."
-HTTP_STATUS_CODE=$(curl -X POST -d '{"test": "data"}' -H "Content-Type: application/json" http://localhost:8080/testwebhook --silent --output /dev/null -w "%{http_code}")
+HTTP_STATUS_CODE=$(curl -X POST \
+  -d '{"test": "data"}' \
+  -H "Content-Type: application/json" \
+  -H "X-Hub-Signature: sha1=testsignature" \
+  -H "X-GitHub-Event: testevent" \
+  -H "X-GitHub-Delivery: testdeliveryid" \
+  http://localhost:8080/testwebhook --silent --output /dev/null -w "%{http_code}")
 echo "Received HTTP status code: $HTTP_STATUS_CODE"
 
 # Cleanup function
