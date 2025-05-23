@@ -31,7 +31,7 @@ trap cleanup EXIT
 if [ ! -f "$GWP_BINARY" ]; then
     echo "gitwebhookproxy binary not found at $GWP_BINARY. Attempting to build..."
     if command -v go &> /dev/null; then
-        (cd ../../ && go build -o "$GWP_BINARY" .) # Build in repo root
+        (cd ../../ && go build -o "gitwebhookproxy" .) # Build in repo root, output to repo root
         if [ $? -ne 0 ]; then
             echo "Failed to build gitwebhookproxy. Exiting."
             exit 1
