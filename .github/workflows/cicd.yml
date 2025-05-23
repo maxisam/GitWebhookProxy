@@ -1,0 +1,112 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-app:
+    name: Build Go Application
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.19' # Should match the Go version in Dockerfile.build
+
+      - name: Build application
+        run: go build -v -o gitwebhookproxy .
+        # This creates the binary in the root, as expected by the E2E script.
+
+      - name: Upload artifact (application binary)
+        uses: actions/upload-artifact@v3
+        with:
+          name: gitwebhookproxy-binary
+          path: gitwebhookproxy
+
+  run-e2e-tests:
+    name: Run E2E Tests
+    runs-on: ubuntu-latest
+    needs: build-app # Depends on the application build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download application binary
+        uses: actions/download-artifact@v3
+        with:
+          name: gitwebhookproxy-binary
+          path: . # Download to current directory
+
+      - name: Make binary executable
+        run: chmod +x ./gitwebhookproxy
+
+      - name: Make E2E test script executable
+        run: chmod +x ./test/e2e/e2e_test.sh
+
+      - name: Run E2E tests
+        # Ensure necessary tools like curl and netcat are available.
+        # ubuntu-latest should have them.
+        run: ./test/e2e/e2e_test.sh
+
+  build-and-push-docker:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: run-e2e-tests # Depends on successful E2E tests
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' # Only run on push to main
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        # Used for multi-platform builds, good practice though not strictly necessary for amd64
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        # Enables more advanced build features with BuildKit
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }} # User needs to set this secret
+          password: ${{ secrets.DOCKERHUB_TOKEN }}   # User needs to set this secret
+
+      - name: Build the builder image (first stage)
+        run: docker build -t gitwebhookproxy-builder -f build/package/Dockerfile.build .
+
+      - name: Create temporary directory for runtime artifacts
+        run: mkdir -p ./tmp_build_output
+
+      - name: Extract artifacts from builder image
+        # This command runs the builder image and extracts Dockerfile.run and the GitWebhookProxy binary
+        run: docker run --rm gitwebhookproxy-builder tar -cf - -C / Dockerfile.run GitWebhookProxy | tar -xf - -C ./tmp_build_output
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/gitwebhookproxy 
+          tags: |
+            type=sha,prefix= # Git SHA as a tag
+            type=raw,value=latest,enable={{is_default_branch}} # 'latest' tag for the main branch
+
+      - name: Build and push final Docker image (second stage)
+        uses: docker/build-push-action@v4
+        with:
+          context: ./tmp_build_output # Build context is the directory with Dockerfile.run and the binary
+          file: ./tmp_build_output/Dockerfile.run # Specify the Dockerfile for the final image
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Clean up temporary build directory
+        if: always() # Ensure cleanup runs even if previous steps fail
+        run: rm -rf ./tmp_build_output
