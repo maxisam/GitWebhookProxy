@@ -48,7 +48,7 @@ fi
 
 
 echo "Starting gitwebhookproxy..."
-"$GWP_BINARY" -listen :8080 -upstreamURL http://localhost:8081 -provider dummy -allowedPaths /testwebhook &
+"$GWP_BINARY" -listen :8080 -upstreamURL http://localhost:8081 -allowedPaths /testwebhook &
 GWP_PID=$!
 echo "gitwebhookproxy started with PID: $GWP_PID"
 sleep 2 # Wait for proxy to start
