@@ -8,7 +8,8 @@ echo "Setting up mock upstream server..."
 # Ensure /tmp/upstream_received.txt is clean before test
 rm -f /tmp/upstream_received.txt
 # Start nc: send a 200 OK response, then write client's request to /tmp/upstream_received.txt
-(echo -ne "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n" | nc -l -p 8081 > /tmp/upstream_received.txt) &
+# Add -q 1 to make nc wait 1s after stdin closes before quitting
+(echo -ne "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n" | nc -l -q 1 -p 8081 > /tmp/upstream_received.txt) &
 NC_PID=$!
 echo "Mock upstream server started with PID: $NC_PID"
 sleep 2 # Wait for nc to start
