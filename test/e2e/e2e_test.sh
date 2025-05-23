@@ -5,7 +5,10 @@ echo "Starting E2E test..."
 
 # 1. Set up a mock upstream server
 echo "Setting up mock upstream server..."
-nc -l -p 8081 > /tmp/upstream_received.txt &
+# Ensure /tmp/upstream_received.txt is clean before test
+rm -f /tmp/upstream_received.txt
+# Start nc: send a 200 OK response, then write client's request to /tmp/upstream_received.txt
+(echo -ne "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n" | nc -l -p 8081 > /tmp/upstream_received.txt) &
 NC_PID=$!
 echo "Mock upstream server started with PID: $NC_PID"
 sleep 2 # Wait for nc to start
@@ -22,7 +25,7 @@ if [ ! -f "$GWP_BINARY" ]; then
         if [ $? -ne 0 ]; then
             echo "Failed to build gitwebhookproxy. Exiting."
             # Clean up nc before exiting
-            kill $NC_PID
+            kill $NC_PID 2>/dev/null || true
             wait $NC_PID 2>/dev/null || true
             exit 1
         fi
@@ -30,7 +33,7 @@ if [ ! -f "$GWP_BINARY" ]; then
     else
         echo "Go is not installed. Cannot build gitwebhookproxy. Exiting."
         # Clean up nc before exiting
-        kill $NC_PID
+        kill $NC_PID 2>/dev/null || true
         wait $NC_PID 2>/dev/null || true
         exit 1
     fi
@@ -40,7 +43,7 @@ elif [ ! -x "$GWP_BINARY" ]; then
     if [ $? -ne 0 ]; then
         echo "Failed to make $GWP_BINARY executable. Exiting."
         # Clean up nc before exiting
-        kill $NC_PID
+        kill $NC_PID 2>/dev/null || true
         wait $NC_PID 2>/dev/null || true
         exit 1
     fi
@@ -48,14 +51,20 @@ fi
 
 
 echo "Starting gitwebhookproxy..."
-"$GWP_BINARY" -listen :8080 -upstreamURL http://localhost:8081 -provider dummy -allowedPaths /testwebhook &
+"$GWP_BINARY" -listen :8080 -upstreamURL http://localhost:8081 -allowedPaths /testwebhook &
 GWP_PID=$!
 echo "gitwebhookproxy started with PID: $GWP_PID"
 sleep 2 # Wait for proxy to start
 
 # 3. Send a test webhook
 echo "Sending test webhook..."
-HTTP_STATUS_CODE=$(curl -X POST -d '{"test": "data"}' -H "Content-Type: application/json" http://localhost:8080/testwebhook --silent --output /dev/null -w "%{http_code}")
+HTTP_STATUS_CODE=$(curl -X POST \
+  -d '{"test": "data"}' \
+  -H "Content-Type: application/json" \
+  -H "X-Hub-Signature: sha1=testsignature" \
+  -H "X-GitHub-Event: testevent" \
+  -H "X-GitHub-Delivery: testdeliveryid" \
+  http://localhost:8080/testwebhook --silent --output /dev/null -w "%{http_code}")
 echo "Received HTTP status code: $HTTP_STATUS_CODE"
 
 # Cleanup function
@@ -65,7 +74,7 @@ cleanup() {
     kill $GWP_PID
     wait $GWP_PID 2>/dev/null || true # Wait for process to terminate, ignore error if already dead
     echo "Killing mock upstream server (PID: $NC_PID)..."
-    kill $NC_PID
+    kill $NC_PID 2>/dev/null || true
     wait $NC_PID 2>/dev/null || true # Wait for process to terminate, ignore error if already dead
     echo "Removing /tmp/upstream_received.txt..."
     rm -f /tmp/upstream_received.txt
@@ -81,8 +90,25 @@ if [[ "$HTTP_STATUS_CODE" -lt 200 || "$HTTP_STATUS_CODE" -ge 300 ]]; then
 fi
 echo "HTTP status code OK."
 
-if [ ! -s /tmp/upstream_received.txt ]; then
-    echo "Error: /tmp/upstream_received.txt is empty. Mock upstream server received no data."
+# Wait for upstream_received.txt to be populated
+MAX_WAIT_SECONDS=10
+WAIT_INTERVAL_SECONDS=1
+ELAPSED_SECONDS=0
+FILE_POPULATED=false
+
+echo "Waiting for mock upstream server to receive data..."
+while [ $ELAPSED_SECONDS -lt $MAX_WAIT_SECONDS ]; do
+    if [ -s /tmp/upstream_received.txt ]; then
+        FILE_POPULATED=true
+        break
+    fi
+    sleep $WAIT_INTERVAL_SECONDS
+    ELAPSED_SECONDS=$((ELAPSED_SECONDS + WAIT_INTERVAL_SECONDS))
+    echo "Waited $ELAPSED_SECONDS seconds..."
+done
+
+if [ "$FILE_POPULATED" = false ]; then
+    echo "Error: /tmp/upstream_received.txt is empty or does not exist after $MAX_WAIT_SECONDS seconds. Mock upstream server received no data."
     cleanup
     exit 1
 fi
