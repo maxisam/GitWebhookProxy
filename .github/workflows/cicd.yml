@@ -61,7 +61,8 @@ jobs:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
     needs: run-e2e-tests # Depends on successful E2E tests
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' # Only run on push to main
+    # Only run on push to main  or when manually triggered
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
