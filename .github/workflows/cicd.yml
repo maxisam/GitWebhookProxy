@@ -36,6 +36,18 @@ jobs:
     name: Run E2E Tests
     runs-on: ubuntu-latest
     needs: build-app # Depends on the application build
+    services:
+      echo-server:
+        image: ealen/echo-server:latest
+        ports:
+          - 8081:80 # Map host port 8081 to container port 80
+        # Health check to ensure the service is ready before proceeding
+        # The /health endpoint is common for ealen/echo-server
+        options: >-
+          --health-cmd "curl -f http://localhost:80/health || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -53,9 +65,14 @@ jobs:
         run: chmod +x ./test/e2e/e2e_test.sh
 
       - name: Run E2E tests
-        # Ensure necessary tools like curl and netcat are available.
-        # ubuntu-latest should have them.
+        # The echo-server will be available at http://localhost:8081
+        # or echo-server:80 (if scripts/apps are run inside another container on the same docker network)
+        # For scripts running directly on the runner (like e2e_test.sh), localhost:8081 is correct.
         run: ./test/e2e/e2e_test.sh
+
+      - name: Display echo-server logs on failure
+        if: failure()
+        run: docker logs echo-server || echo "Could not retrieve echo-server logs."
 
   build-and-push-docker:
     name: Build and Push Docker Image
@@ -120,6 +137,16 @@ jobs:
         run: rm -rf ./tmp_build_output
 
       - name: Create GitHub Release
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2.0.8
+        with:
+          tag_name: ${{ steps.version.outputs.APP_VERSION }}
+          name: Release ${{ steps.version.outputs.APP_VERSION }}
+          body: "Release ${{ steps.version.outputs.APP_VERSION }}"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2.0.8
         with:
