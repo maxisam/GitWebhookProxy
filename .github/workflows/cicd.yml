@@ -147,13 +147,3 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        if: github.event_name == 'workflow_dispatch'
-        uses: softprops/action-gh-release@v2.0.8
-        with:
-          tag_name: ${{ steps.version.outputs.APP_VERSION }}
-          name: Release ${{ steps.version.outputs.APP_VERSION }}
-          body: "Release ${{ steps.version.outputs.APP_VERSION }}"
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
