@@ -41,6 +41,14 @@ jobs:
         image: ealen/echo-server:latest
         ports:
           - 8081:80 # Map host port 8081 to container port 80
+      echo-server2:
+        image: ealen/echo-server:latest
+        ports:
+          - 8082:80 # Map host port 8082 to container port 80
+      echo-server3:
+        image: ealen/echo-server:latest
+        ports:
+          - 8083:80 # Map host port 8083 to container port 80
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -65,7 +73,10 @@ jobs:
 
       - name: Display echo-server logs on failure
         if: failure()
-        run: docker logs echo-server || echo "Could not retrieve echo-server logs."
+        run: |
+          docker logs echo-server || echo "Could not retrieve echo-server logs."
+          docker logs echo-server2 || echo "Could not retrieve echo-server2 logs."
+          docker logs echo-server3 || echo "Could not retrieve echo-server3 logs."
 
   build-and-push-docker:
     name: Build and Push Docker Image

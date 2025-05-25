@@ -878,7 +878,7 @@ func TestProxy_Run(t *testing.T) {
 
 func TestNewProxy(t *testing.T) {
 	type args struct {
-		upstreamURL  string
+		upstreamURLs []string
 		allowedPaths []string
 		provider     string
 		secret       string
@@ -893,32 +893,93 @@ func TestNewProxy(t *testing.T) {
 		{
 			name: "TestNewProxyWithValidArgs",
 			args: args{
-				upstreamURL:  httpBinURLSecure,
+				upstreamURLs: []string{httpBinURLSecure},
 				allowedPaths: []string{},
 				provider:     providers.GitlabProviderKind,
 				secret:       proxyGitlabTestSecret,
 			},
 			want: &Proxy{
-				upstreamURL:  httpBinURLSecure,
+				upstreamURLs: []string{httpBinURLSecure},
 				allowedPaths: []string{},
 				provider:     providers.GitlabProviderKind,
 				secret:       proxyGitlabTestSecret,
 			},
 		},
 		{
-			name: "TestNewProxyWithEmptyUpstreamURL",
+			name: "TestNewProxyWithMultipleValidUpstreamURLs",
 			args: args{
-				upstreamURL:  "",
+				upstreamURLs: []string{httpBinURLSecure, httpBinURLInsecure},
 				allowedPaths: []string{},
 				provider:     providers.GitlabProviderKind,
 				secret:       proxyGitlabTestSecret,
 			},
-			wantErr: true,
+			want: &Proxy{
+				upstreamURLs: []string{httpBinURLSecure, httpBinURLInsecure},
+				allowedPaths: []string{},
+				provider:     providers.GitlabProviderKind,
+				secret:       proxyGitlabTestSecret,
+			},
+		},
+		{
+			name: "TestNewProxyWithEmptyUpstreamURLsSlice",
+			args: args{
+				upstreamURLs: []string{},
+				allowedPaths: []string{},
+				provider:     providers.GitlabProviderKind,
+				secret:       proxyGitlabTestSecret,
+			},
+			wantErr: true, // Expects "Cannot create Proxy with no upstreamURLs"
+		},
+		{
+			name: "TestNewProxyWithNilUpstreamURLsSlice",
+			args: args{
+				upstreamURLs: nil,
+				allowedPaths: []string{},
+				provider:     providers.GitlabProviderKind,
+				secret:       proxyGitlabTestSecret,
+			},
+			wantErr: true, // Expects "Cannot create Proxy with no upstreamURLs"
+		},
+		{
+			name: "TestNewProxyWithUpstreamURLsSliceContainingEmptyString",
+			args: args{
+				upstreamURLs: []string{""},
+				allowedPaths: []string{},
+				provider:     providers.GitlabProviderKind,
+				secret:       proxyGitlabTestSecret,
+			},
+			wantErr: true, // Expects "Cannot create Proxy with an empty URL in upstreamURLs list"
+		},
+		{
+			name: "TestNewProxyWithUpstreamURLsSliceContainingValidAndEmptyString",
+			args: args{
+				upstreamURLs: []string{httpBinURLSecure, ""},
+				allowedPaths: []string{},
+				provider:     providers.GitlabProviderKind,
+				secret:       proxyGitlabTestSecret,
+			},
+			wantErr: true, // Expects "Cannot create Proxy with an empty URL in upstreamURLs list"
+		},
+		{
+			name: "TestNewProxyWithDuplicateValidUpstreamURLs",
+			args: args{
+				upstreamURLs: []string{httpBinURLSecure, httpBinURLSecure},
+				allowedPaths: []string{},
+				provider:     providers.GitlabProviderKind,
+				secret:       proxyGitlabTestSecret,
+			},
+			want: &Proxy{
+				upstreamURLs: []string{httpBinURLSecure, httpBinURLSecure},
+				allowedPaths: []string{},
+				provider:     providers.GitlabProviderKind,
+				secret:       proxyGitlabTestSecret,
+			},
+			wantErr: false,
 		},
 		{
 			name: "TestNewProxyWithNilAllowedPaths",
 			args: args{
-				upstreamURL:  httpBinURLSecure,
+				upstreamURLs: []string{httpBinURLSecure},
 				allowedPaths: nil,
 				provider:     providers.GitlabProviderKind,
 				secret:       proxyGitlabTestSecret,
@@ -928,7 +989,7 @@ func TestNewProxy(t *testing.T) {
 		{
 			name: "TestNewProxyWithEmptyProvider",
 			args: args{
-				upstreamURL:  httpBinURLSecure,
+				upstreamURLs: []string{httpBinURLSecure},
 				allowedPaths: []string{},
 				provider:     "",
 				secret:       proxyGitlabTestSecret,
@@ -936,9 +997,9 @@ func TestNewProxy(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "TestNewProxyWithEmptySecret",
+			name: "TestNewProxyWithEmptySecretAndNilAllowedPaths", // secret can be empty, but allowedPaths nil is an error
 			args: args{
-				upstreamURL:  httpBinURLSecure,
+				upstreamURLs: []string{httpBinURLSecure},
 				allowedPaths: nil,
 				provider:     providers.GitlabProviderKind,
 				secret:       "",
@@ -946,16 +1007,31 @@ func TestNewProxy(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "TestNewProxyWithEmptySecretAndValidAllowedPaths", // secret can be empty
+			args: args{
+				upstreamURLs: []string{httpBinURLSecure},
+				allowedPaths: []string{},
+				provider:     providers.GitlabProviderKind,
+				secret:       "",
+			},
+			want: &Proxy{
+				upstreamURLs: []string{httpBinURLSecure},
+				allowedPaths: []string{},
+				provider:     providers.GitlabProviderKind,
+				secret:       "",
+			},
+		},
+		{
 			name: "TestNewProxyWithValidArgsAndAllowedPaths",
 			args: args{
-				upstreamURL:  httpBinURLSecure,
+				upstreamURLs: []string{httpBinURLSecure},
 				allowedPaths: []string{"/path1", "/path2"},
 				provider:     providers.GitlabProviderKind,
 				secret:       proxyGitlabTestSecret,
 				ignoredUsers: []string{"user1"},
 			},
 			want: &Proxy{
-				upstreamURL:  httpBinURLSecure,
+				upstreamURLs: []string{httpBinURLSecure},
 				allowedPaths: []string{"/path1", "/path2"},
 				provider:     providers.GitlabProviderKind,
 				secret:       proxyGitlabTestSecret,
@@ -965,11 +1041,24 @@ func TestNewProxy(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewProxy(tt.args.upstreamURL, tt.args.allowedPaths, tt.args.provider, tt.args.secret, tt.args.ignoredUsers)
+			got, err := NewProxy(tt.args.upstreamURLs, tt.args.allowedPaths, tt.args.provider, tt.args.secret, tt.args.ignoredUsers)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewProxy() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+			if tt.wantErr {
+				expectedErrorMsg := ""
+				if tt.name == "TestNewProxyWithEmptyUpstreamURLsSlice" || tt.name == "TestNewProxyWithNilUpstreamURLsSlice" {
+					expectedErrorMsg = "Cannot create Proxy with no upstreamURLs"
+				} else if tt.name == "TestNewProxyWithUpstreamURLsSliceContainingEmptyString" || tt.name == "TestNewProxyWithUpstreamURLsSliceContainingValidAndEmptyString" {
+					expectedErrorMsg = "Cannot create Proxy with an empty URL in upstreamURLs list"
+				}
+				if err != nil && err.Error() != expectedErrorMsg {
+					t.Errorf("NewProxy() error = %v, wantErrMsg %v", err.Error(), expectedErrorMsg)
+				}
+				return // Do not proceed to DeepEqual check if an error is expected
+			}
+			// Since we are checking for errors, we only compare 'got' and 'want' if no error is expected.
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NewProxy() = %v, want %v", got, tt.want)
 			}
@@ -977,10 +1066,241 @@ func TestNewProxy(t *testing.T) {
 	}
 }
 
+func TestProxy_proxyRequest_MultiUpstream(t *testing.T) {
+	// Common setup for multi-upstream tests
+	createTestRequest := func(method, path string, body string) *http.Request {
+		req := httptest.NewRequest(method, path, bytes.NewReader([]byte(body)))
+		// Add common headers if necessary, e.g., for provider validation if secret is used
+		req.Header.Add(providers.ContentTypeHeader, providers.DefaultContentTypeHeaderValue)
+		return req
+	}
+
+	t.Run("BasicFanOut_BothSucceed_ReturnsFirstResponse", func(t *testing.T) {
+		hitCounter1 := 0
+		server1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hitCounter1++
+			w.Header().Set("X-Server-ID", "server1")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("response from server1"))
+		}))
+		defer server1.Close()
+
+		hitCounter2 := 0
+		server2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hitCounter2++
+			w.Header().Set("X-Server-ID", "server2")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("response from server2"))
+		}))
+		defer server2.Close()
+
+		p, err := NewProxy(
+			[]string{server1.URL, server2.URL},
+			[]string{}, // Allow all paths
+			providers.GithubProviderKind, // Using github for simplicity, no complex validation
+			"", // No secret
+			[]string{}, // No ignored users
+		)
+		if err != nil {
+			t.Fatalf("Failed to create proxy: %v", err)
+		}
+
+		req := createTestRequest(http.MethodPost, "/testpath", "request body")
+		rr := httptest.NewRecorder()
+		// Need a router to match the /*path pattern
+		router := httprouter.New()
+		router.POST("/*path", p.proxyRequest)
+		router.ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusOK {
+			t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
+		}
+
+		expectedBody := "response from server1"
+		if rr.Body.String() != expectedBody {
+			t.Errorf("handler returned unexpected body: got %v want %v", rr.Body.String(), expectedBody)
+		}
+		expectedHeader := "server1"
+		if rr.Header().Get("X-Server-ID") != expectedHeader {
+			t.Errorf("handler returned unexpected X-Server-ID header: got %v want %v", rr.Header().Get("X-Server-ID"), expectedHeader)
+		}
+
+		if hitCounter1 != 1 {
+			t.Errorf("server1 expected 1 hit, got %d", hitCounter1)
+		}
+		if hitCounter2 != 1 {
+			t.Errorf("server2 expected 1 hit, got %d", hitCounter2)
+		}
+	})
+
+	t.Run("FirstUpstreamFails_SecondSucceeds", func(t *testing.T) {
+		hitCounter1 := 0
+		server1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hitCounter1++
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("server1 error"))
+		}))
+		defer server1.Close()
+
+		hitCounter2 := 0
+		server2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hitCounter2++
+			w.Header().Set("X-Server-ID", "server2")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("response from server2"))
+		}))
+		defer server2.Close()
+
+		p, err := NewProxy(
+			[]string{server1.URL, server2.URL},
+			[]string{}, providers.GithubProviderKind, "", []string{},
+		)
+		if err != nil {
+			t.Fatalf("Failed to create proxy: %v", err)
+		}
+
+		req := createTestRequest(http.MethodPost, "/testpath", "request body")
+		rr := httptest.NewRecorder()
+		router := httprouter.New()
+		router.POST("/*path", p.proxyRequest)
+		router.ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusOK {
+			t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
+		}
+		expectedBody := "response from server2"
+		if rr.Body.String() != expectedBody {
+			t.Errorf("handler returned unexpected body: got %v want %v", rr.Body.String(), expectedBody)
+		}
+		expectedHeader := "server2"
+		if rr.Header().Get("X-Server-ID") != expectedHeader {
+			t.Errorf("handler returned unexpected X-Server-ID header: got %v want %v", rr.Header().Get("X-Server-ID"), expectedHeader)
+		}
+
+		if hitCounter1 != 1 {
+			t.Errorf("server1 expected 1 hit, got %d", hitCounter1)
+		}
+		if hitCounter2 != 1 {
+			t.Errorf("server2 expected 1 hit, got %d", hitCounter2)
+		}
+	})
+
+	t.Run("AllUpstreamsFail", func(t *testing.T) {
+		hitCounter1 := 0
+		server1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hitCounter1++
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer server1.Close()
+
+		hitCounter2 := 0
+		server2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hitCounter2++
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}))
+		defer server2.Close()
+
+		p, err := NewProxy(
+			[]string{server1.URL, server2.URL},
+			[]string{}, providers.GithubProviderKind, "", []string{},
+		)
+		if err != nil {
+			t.Fatalf("Failed to create proxy: %v", err)
+		}
+
+		req := createTestRequest(http.MethodPost, "/testpath", "request body")
+		rr := httptest.NewRecorder()
+		router := httprouter.New()
+		router.POST("/*path", p.proxyRequest)
+		router.ServeHTTP(rr, req)
+
+		// As per current implementation, it should be InternalServerError
+		if status := rr.Code; status != http.StatusInternalServerError {
+			t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusInternalServerError)
+		}
+		// Body should be "All upstream requests failed"
+		expectedBody := "All upstream requests failed\n" // http.Error adds a newline
+		if rr.Body.String() != expectedBody {
+			t.Errorf("handler returned unexpected body: got '%v' want '%v'", rr.Body.String(), expectedBody)
+		}
+
+		if hitCounter1 != 1 {
+			t.Errorf("server1 expected 1 hit, got %d", hitCounter1)
+		}
+		if hitCounter2 != 1 {
+			t.Errorf("server2 expected 1 hit, got %d", hitCounter2)
+		}
+	})
+
+	t.Run("RequestPathAndQueryPreservation", func(t *testing.T) {
+		expectedPath := "/specific/path"
+		expectedQuery := "param1=val1&param2=val2"
+		fullRequestPath := expectedPath + "?" + expectedQuery
+
+		pathAndQueryChecker := func(t *testing.T, serverName string, counter *int) http.HandlerFunc {
+			return func(w http.ResponseWriter, r *http.Request) {
+				(*counter)++
+				if r.URL.Path != expectedPath {
+					t.Errorf("%s received wrong path: got %s want %s", serverName, r.URL.Path, expectedPath)
+				}
+				if r.URL.RawQuery != expectedQuery {
+					t.Errorf("%s received wrong query: got %s want %s", serverName, r.URL.RawQuery, expectedQuery)
+				}
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(serverName + " success"))
+			}
+		}
+
+		hitCounter1 := 0
+		server1 := httptest.NewServer(pathAndQueryChecker(t, "server1", &hitCounter1))
+		defer server1.Close()
+
+		hitCounter2 := 0
+		server2 := httptest.NewServer(pathAndQueryChecker(t, "server2", &hitCounter2))
+		defer server2.Close()
+
+		p, err := NewProxy(
+			[]string{server1.URL, server2.URL},
+			[]string{}, providers.GithubProviderKind, "", []string{},
+		)
+		if err != nil {
+			t.Fatalf("Failed to create proxy: %v", err)
+		}
+
+		req := createTestRequest(http.MethodPost, fullRequestPath, "request body for path/query test")
+		rr := httptest.NewRecorder()
+		router := httprouter.New()
+		router.POST("/*path", p.proxyRequest) // Use /*path to capture the full path
+		router.ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusOK {
+			t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
+		}
+		
+		// Response should be from server1
+		expectedBody := "server1 success"
+		if rr.Body.String() != expectedBody {
+			t.Errorf("handler returned unexpected body: got %v want %v", rr.Body.String(), expectedBody)
+		}
+
+		if hitCounter1 != 1 {
+			t.Errorf("server1 expected 1 hit, got %d", hitCounter1)
+		}
+		if hitCounter2 != 1 {
+			t.Errorf("server2 expected 1 hit, got %d", hitCounter2)
+		}
+	})
+	
+	// Specific Response Content and Headers is implicitly tested by BasicFanOut and FirstUpstreamFails_SecondSucceeds
+	// as they check for specific body and headers from the successful server.
+
+	// No Upstream URLs test for NewProxy is already covered in TestNewProxy.
+}
+
 func TestProxy_isIgnoredUser(t *testing.T) {
 	type fields struct {
 		provider     string
-		upstreamURL  string
+		upstreamURLs []string
 		allowedPaths []string
 		secret       string
 		ignoredUsers []string
@@ -1027,7 +1347,7 @@ func TestProxy_isIgnoredUser(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := &Proxy{
 				provider:     tt.fields.provider,
-				upstreamURL:  tt.fields.upstreamURL,
+				upstreamURLs: tt.fields.upstreamURLs,
 				allowedPaths: tt.fields.allowedPaths,
 				secret:       tt.fields.secret,
 				ignoredUsers: tt.fields.ignoredUsers,
@@ -1042,7 +1362,7 @@ func TestProxy_isIgnoredUser(t *testing.T) {
 func TestProxy_isAllowedUser(t *testing.T) {
 	type fields struct {
 		provider     string
-		upstreamURL  string
+		upstreamURLs []string
 		allowedPaths []string
 		secret       string
 		allowedUsers []string
@@ -1103,7 +1423,7 @@ func TestProxy_isAllowedUser(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := &Proxy{
 				provider:     tt.fields.provider,
-				upstreamURL:  tt.fields.upstreamURL,
+				upstreamURLs: tt.fields.upstreamURLs,
 				allowedPaths: tt.fields.allowedPaths,
 				secret:       tt.fields.secret,
 				allowedUsers: tt.fields.allowedUsers,

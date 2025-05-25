@@ -34,7 +34,8 @@ GitWebhookProxy can be configured by providing the following arguments either vi
 | Parameter     | Description                                                                       | Default  | Example                                    |
 |---------------|-----------------------------------------------------------------------------------|----------|--------------------------------------------|
 | listenAddress | Address on which the proxy listens.                                               | `:8080`  | `127.0.0.1:80`                             |
-| upstreamURL   | URL to which the proxy requests will be forwarded (required)                      |          | `https://someci-instance-url.com/webhook/` |
+| upstreamURL   | Primary URL to which proxy requests will be forwarded. At least one upstream target must be provided via `upstreamURL` or `upstreamURLs`. |          | `https://someci-instance-url.com/webhook/` |
+| upstreamURLs  | Comma-separated string list of additional upstream URLs to which proxy requests will be forwarded. Requests are sent to all URLs specified in both `upstreamURL` (if provided) and `upstreamURLs`. |          | `http://server1/hook,http://server2/path`  |
 | secret        | Secret of the Webhook API. If not set validation is not made.                     |          | `iamasecret`                               |
 | provider      | Git Provider which generates the Webhook                                          | `github` | `github` or `gitlab`                       |
 | allowedPaths  | Comma-Separated String List of allowed paths on the proxy                         |          | `/project` or `github-webhook/,project/`   |
@@ -116,9 +117,15 @@ Alternatively if you have configured helm on your cluster, you can add gitwebhoo
 ### Run with Docker
 
 To run the docker container outside of Kubernetes, you can pass the configuration as the Container Entrypoint arguments.
-The docker image is available on docker hub. Example below:
+The docker image is available on docker hub. Examples below:
 
-`docker run stakater/gitwebhookproxy:v0.2.63 -listen :8080 -upstreamURL google.com -provider github -secret "test"`
+**Single Upstream:**
+`docker run stakater/gitwebhookproxy:v0.2.63 -listen :8080 -upstreamURL http://jenkins.example.com/github-webhook/ -provider github -secret "test"`
+
+**Multiple Upstreams:**
+`docker run stakater/gitwebhookproxy:v0.2.63 -listen :8080 -upstreamURL http://jenkins1.example.com/hook -upstreamURLs http://jenkins2.example.com/hook,http://backup-jenkins/other-hook -provider github`
+
+Note: Ensure your image version (e.g., `v0.2.63`) is up-to-date with one that supports multiple upstreams.
 
 ### Run with Docker compose
 
