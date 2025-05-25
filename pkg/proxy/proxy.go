@@ -31,7 +31,7 @@ var (
 
 type Proxy struct {
 	provider     string
-	upstreamURL  string
+	upstreamURLs []string
 	allowedPaths []string
 	secret       string
 	ignoredUsers []string
@@ -115,14 +115,6 @@ func (p *Proxy) redirect(hook *providers.Hook, redirectURL string) (*http.Respon
 }
 
 func (p *Proxy) proxyRequest(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-	redirectURL := p.upstreamURL + r.URL.Path
-
-	if r.URL.RawQuery != "" {
-		redirectURL += "?" + r.URL.RawQuery
-	}
-
-	log.Printf("Proxying Request from '%s', to upstream '%s'\n", r.URL, redirectURL)
-
 	if !p.isPathAllowed(r.URL.Path) {
 		log.Printf("Not allowed to proxy path: '%s'", r.URL.Path)
 		http.Error(w, "Not allowed to proxy path: '"+r.URL.Path+"'", http.StatusForbidden)
@@ -162,31 +154,71 @@ func (p *Proxy) proxyRequest(w http.ResponseWriter, r *http.Request, params http
 		return
 	}
 
-	resp, errs := p.redirect(hook, redirectURL)
-	if errs != nil {
-		log.Printf("Error Redirecting '%s' to upstream '%s': %s\n", r.URL, redirectURL, errs)
-		http.Error(w, "Error Redirecting '"+r.URL.String()+"' to upstream '"+redirectURL+"'", http.StatusInternalServerError)
-		return
+	var responses []*http.Response
+	var errorsList []error // Renamed to avoid conflict with the 'errors' package
+
+	for _, upstream := range p.upstreamURLs {
+		redirectURL := upstream + r.URL.Path
+		if r.URL.RawQuery != "" {
+			redirectURL += "?" + r.URL.RawQuery // Corrected query string concatenation
+		}
+
+		log.Printf("Proxying Request from '%s', to upstream '%s'\n", r.URL, redirectURL)
+		resp, errRedirect := p.redirect(hook, redirectURL)
+		responses = append(responses, resp)
+		errorsList = append(errorsList, errRedirect) // Use renamed variable
 	}
 
-	if resp.StatusCode >= 400 {
-		log.Printf("Error Redirecting '%s' to upstream '%s', Upstream Redirect Status: %s\n", r.URL, redirectURL, resp.Status)
-		http.Error(w, "Error Redirecting '"+r.URL.String()+"' to upstream '"+redirectURL+"' Upstream Redirect Status:"+resp.Status, resp.StatusCode)
-		return
+	var successfulResponse *http.Response
+	var lastError error
+
+	for i, resp := range responses {
+		upstreamErr := errorsList[i]
+		currentUpstreamURL := p.upstreamURLs[i] // For logging
+
+		if upstreamErr != nil {
+			log.Printf("Error redirecting to upstream '%s': %s\n", currentUpstreamURL, upstreamErr)
+			lastError = upstreamErr // Keep track of errors
+			if resp != nil && resp.Body != nil { // Ensure body is closed even if there was an error during request
+				resp.Body.Close()
+			}
+			continue
+		}
+
+		if resp.StatusCode < 400 {
+			log.Printf("Successfully redirected to upstream '%s' with status %s\n", currentUpstreamURL, resp.Status)
+			successfulResponse = resp
+			// Copy headers from this successful response to the client's response writer
+			for key, values := range successfulResponse.Header {
+				for _, value := range values {
+					w.Header().Add(key, value)
+				}
+			}
+			// We will write body and status code after breaking the loop
+			break // Found a successful response
+		} else {
+			log.Printf("Upstream '%s' returned error status: %s\n", currentUpstreamURL, resp.Status)
+			lastError = fmt.Errorf("upstream %s returned status %s", currentUpstreamURL, resp.Status)
+			if resp.Body != nil {
+				resp.Body.Close()
+			}
+		}
 	}
 
-	log.Printf("Redirected incomming request '%s' to '%s' with Response: '%s'\n",
-		r.URL, redirectURL, resp.Status)
-
-	responseBody, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("Error Reading upstream '%s' response body\n", r.URL)
-		http.Error(w, "Error Reading upstream '"+redirectURL+"' Response body", http.StatusInternalServerError)
-		return
+	if successfulResponse != nil {
+		defer successfulResponse.Body.Close()
+		responseBody, errReadBody := ioutil.ReadAll(successfulResponse.Body)
+		if errReadBody != nil {
+			log.Printf("Error reading response body from successful upstream: %s\n", errReadBody)
+			http.Error(w, "Error reading response body", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(successfulResponse.StatusCode)
+		w.Write(responseBody)
+	} else {
+		log.Printf("All upstream requests failed. Last error: %v\n", lastError)
+		http.Error(w, "All upstream requests failed", http.StatusInternalServerError)
 	}
-
-	w.WriteHeader(resp.StatusCode)
-	w.Write(responseBody)
 }
 
 // Health Check Endpoint
@@ -209,11 +241,16 @@ func (p *Proxy) Run(listenAddress string) error {
 	return http.ListenAndServe(listenAddress, router)
 }
 
-func NewProxy(upstreamURL string, allowedPaths []string,
+func NewProxy(initialUpstreamURLs []string, allowedPaths []string,
 	provider string, secret string, ignoredUsers []string) (*Proxy, error) {
 	// Validate Params
-	if len(strings.TrimSpace(upstreamURL)) == 0 {
-		return nil, errors.New("Cannot create Proxy with empty upstreamURL")
+	if initialUpstreamURLs == nil || len(initialUpstreamURLs) == 0 {
+		return nil, errors.New("Cannot create Proxy with no upstreamURLs")
+	}
+	for _, u := range initialUpstreamURLs {
+		if len(strings.TrimSpace(u)) == 0 {
+			return nil, errors.New("Cannot create Proxy with an empty URL in upstreamURLs list")
+		}
 	}
 	if len(strings.TrimSpace(provider)) == 0 {
 		return nil, errors.New("Cannot create Proxy with empty provider")
@@ -224,7 +261,7 @@ func NewProxy(upstreamURL string, allowedPaths []string,
 
 	return &Proxy{
 		provider:     provider,
-		upstreamURL:  upstreamURL,
+		upstreamURLs: initialUpstreamURLs,
 		allowedPaths: allowedPaths,
 		secret:       secret,
 		ignoredUsers: ignoredUsers,
