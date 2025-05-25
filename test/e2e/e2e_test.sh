@@ -1,11 +1,19 @@
 #!/bin/bash
 set -e
 
+echo "E2E Test Script Start"
+echo "Current working directory: $(pwd)"
+echo "Listing contents of current directory:"
+ls -la
+echo "Go version: $(go version || echo 'Go not found')"
+echo "GitHub Actions Workspace: $GITHUB_WORKSPACE"
+echo "---"
+
 echo "Starting E2E test..."
 
 # --- Configuration ---
-# Assuming this script is in test/e2e/ and gitwebhookproxy is in the repo root
-GWP_BINARY="../../gitwebhookproxy"
+# Assuming this script is run from the repository root
+GWP_BINARY="./gitwebhookproxy"
 LOG_DIR="/tmp/e2e_gwp_logs" # Directory for GWP logs
 mkdir -p "$LOG_DIR"
 
@@ -28,10 +36,16 @@ cleanup() {
 trap cleanup EXIT
 
 # --- Binary Check & Build ---
+echo "---"
+echo "Attempting to locate GWP binary."
+echo "GWP_BINARY is set to: $GWP_BINARY"
+echo "Absolute path to GWP_BINARY: $(readlink -f "$GWP_BINARY" || echo "readlink failed or binary not found")"
+echo "Listing details for GWP_BINARY path: ls -la $GWP_BINARY || echo "Binary not found at $GWP_BINARY, or path is incorrect.""
+echo "---"
 if [ ! -f "$GWP_BINARY" ]; then
     echo "gitwebhookproxy binary not found at $GWP_BINARY. Attempting to build..."
     if command -v go &> /dev/null; then
-        (cd ../../ && go build -o "gitwebhookproxy" .) # Build in repo root, output to repo root
+        go build -o "$GWP_BINARY" . # Assumes script is run from repo root
         if [ $? -ne 0 ]; then
             echo "Failed to build gitwebhookproxy. Exiting."
             exit 1
