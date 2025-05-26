@@ -1,4 +1,4 @@
-name: Helm Chart Release
+name: ©️ Helm Chart Release
 
 on:
   # push:
@@ -62,12 +62,12 @@ jobs:
         run: |
           CHART_NAME="gitwebhookproxy" # This should match the name in your Chart.yaml
           CHART_VERSION="${{ steps.version.outputs.APP_VERSION }}"
-          OCI_REGISTRY_PATH="oci://docker.io/${{ vars.DOCKER_REPOSITORY }}/gitwebhookproxy"
+          OCI_REGISTRY_PATH="oci://docker.io/${{ vars.DOCKER_REPOSITORY }}"
           
           # The packaged chart file will be something like ./helm-charts/gitwebhookproxy-0.1.0.tgz
           # Adjust based on actual chart name and versioning.
           helm push "./helm-charts/${CHART_NAME}-${CHART_VERSION}.tgz" "${OCI_REGISTRY_PATH}"
-          echo "Pushed Helm chart ${CHART_NAME}-${CHART_VERSION}.tgz to ${OCI_REGISTRY_PATH}"
+          echo "::notice::Helm chart ${CHART_NAME}-${CHART_VERSION} pushed to ${OCI_REGISTRY_PATH}/${CHART_NAME}"
 
       - name: Create GitHub Release for Helm Chart
         if:  github.event_name == 'workflow_dispatch'
