@@ -1,12 +1,12 @@
 name: Helm Chart Release
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'deployments/**'
-      - '.VERSION'
+  # push:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - 'deployments/**'
+  #     - '.VERSION'
   workflow_dispatch: # Allows manual triggering of the workflow
 
 jobs:
@@ -22,13 +22,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          # Fetch all history for all branches and tags so that versioning tools can work correctly.
-          fetch-depth: 0 
+          fetch-depth: 5 
 
       - name: Set up Helm
-        uses: azure/setup-helm@v4 # A popular action for setting up Helm
+        uses: azure/setup-helm@v4
         with:
-          version: 'latest' # Or specify a particular Helm version
+          version: 'latest'
 
       - name: Read version from .VERSION file
         id: version
@@ -38,14 +37,9 @@ jobs:
         run: |
           CHART_PATH="deployments/kubernetes/chart/gitwebhookproxy/Chart.yaml"
           NEW_VERSION="${{ steps.version.outputs.APP_VERSION }}"
-          # Update chart version and appVersion
-          # Using yq is robust for YAML manipulation. Ensure yq is available or install it.
-          # As an alternative, sed can be used but is more fragile.
-          # Let's try with sed first for simplicity, assuming a consistent Chart.yaml structure.
           sed -i "s/^version: .*/version: $NEW_VERSION/" "$CHART_PATH"
           sed -i "s/^appVersion: .*/appVersion: $NEW_VERSION/" "$CHART_PATH"
-          echo "Updated Chart.yaml to version $NEW_VERSION and appVersion $NEW_VERSION"
-          cat "$CHART_PATH" # Print file for verification
+          echo "::notice::Updated Chart.yaml to version $NEW_VERSION, chart path: $CHART_PATH"
 
       - name: Commit Chart.yaml changes
         uses: stefanzweifel/git-auto-commit-action@v5
@@ -57,7 +51,6 @@ jobs:
         run: |
           mkdir -p ./helm-charts
           helm package ./deployments/kubernetes/chart/gitwebhookproxy --destination ./helm-charts
-          # ls ./helm-charts # To see the packaged chart
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3.4.0
@@ -69,7 +62,7 @@ jobs:
         run: |
           CHART_NAME="gitwebhookproxy" # This should match the name in your Chart.yaml
           CHART_VERSION="${{ steps.version.outputs.APP_VERSION }}"
-          OCI_REGISTRY_PATH="oci://docker.io/${{ vars.DOCKER_REPOSITORY }}/gitwebhookproxyhelm" # As per user's repo: maxisam/GitWebhookProxy, using 'gitwebhookproxyhelm' for charts
+          OCI_REGISTRY_PATH="oci://docker.io/${{ vars.DOCKER_REPOSITORY }}/gitwebhookproxy"
           
           # The packaged chart file will be something like ./helm-charts/gitwebhookproxy-0.1.0.tgz
           # Adjust based on actual chart name and versioning.
@@ -78,16 +71,15 @@ jobs:
 
       # This part is similar to the existing cicd.yml, consider if it's duplicated or if this workflow should solely handle Helm
       - name: Create GitHub Release for Helm Chart
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' # Ensure it runs for main pushes and manual triggers
+        if:  github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2.0.8
         with:
-          tag_name: helm-v${{ steps.version.outputs.APP_VERSION }} # Differentiate helm tags from app tags if needed
+          tag_name: helm-v${{ steps.version.outputs.APP_VERSION }}
           name: Helm Chart Release v${{ steps.version.outputs.APP_VERSION }}
           body: "Helm chart for GitWebhookProxy version ${{ steps.version.outputs.APP_VERSION }}"
           draft: false
           prerelease: false
-          # Optional: Upload the packaged chart as a release asset
-          # files: |
-          #   ./helm-charts/${CHART_NAME}-${{ steps.version.outputs.APP_VERSION }}.tgz
+          files: |
+            ./helm-charts/${CHART_NAME}-${{ steps.version.outputs.APP_VERSION }}.tgz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
