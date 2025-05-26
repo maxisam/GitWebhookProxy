@@ -69,7 +69,6 @@ jobs:
           helm push "./helm-charts/${CHART_NAME}-${CHART_VERSION}.tgz" "${OCI_REGISTRY_PATH}"
           echo "Pushed Helm chart ${CHART_NAME}-${CHART_VERSION}.tgz to ${OCI_REGISTRY_PATH}"
 
-      # This part is similar to the existing cicd.yml, consider if it's duplicated or if this workflow should solely handle Helm
       - name: Create GitHub Release for Helm Chart
         if:  github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2.0.8
