@@ -47,12 +47,11 @@ jobs:
           echo "Updated Chart.yaml to version $NEW_VERSION and appVersion $NEW_VERSION"
           cat "$CHART_PATH" # Print file for verification
 
-      # Optional: Commit and push the Chart.yaml changes
-      # - name: Commit Chart.yaml changes
-      #   uses: stefanzweifel/git-auto-commit-action@v5
-      #   with:
-      #     commit_message: "ci: Update Helm chart version to ${{ steps.version.outputs.APP_VERSION }}"
-      #     file_pattern: deployments/kubernetes/chart/gitwebhookproxy/Chart.yaml
+      - name: Commit Chart.yaml changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "ci: Update Helm chart version to ${{ steps.version.outputs.APP_VERSION }} [skip ci]"
+          file_pattern: deployments/kubernetes/chart/gitwebhookproxy/Chart.yaml
 
       - name: Package Helm Chart
         run: |
