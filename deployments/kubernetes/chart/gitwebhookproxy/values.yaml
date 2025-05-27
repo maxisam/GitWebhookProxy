@@ -20,6 +20,7 @@ gitWebhookProxy:
   config:
     provider: github
     upstreamURL: "https://jenkins.tools.stackator.com"
+    upstreamURLs: ""
     allowedPaths: "/github-webhook,/project"
     secret: ""
     ignoredUsers: "stakater-user"

@@ -53,6 +53,15 @@ spec:
             {{- else }}
               name: {{ template "gitwebhookproxy.name" . }}
             {{- end }}
+        - name: GWP_UPSTREAMURLs
+          valueFrom:
+            configMapKeyRef:
+              key: upstreamURLs
+            {{- if .Values.gitWebhookProxy.useCustomName }}
+              name: {{ .Values.gitWebhookProxy.customName }}
+            {{- else }}
+              name: {{ template "gitwebhookproxy.name" . }}
+            {{- end }}            
         - name: GWP_ALLOWEDPATHS
           valueFrom:
             configMapKeyRef:

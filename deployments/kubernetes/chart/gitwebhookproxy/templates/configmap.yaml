@@ -16,6 +16,7 @@ data:
     provider: {{ . }}
     {{- end }}
     upstreamURL: {{ .Values.gitWebhookProxy.config.upstreamURL }}
+    upstreamURLs: {{ .Values.gitWebhookProxy.config.upstreamURLs | default "" }}
     {{- with .Values.gitWebhookProxy.config.allowedPaths }}
     allowedPaths: {{ . }}
     {{- end }}
